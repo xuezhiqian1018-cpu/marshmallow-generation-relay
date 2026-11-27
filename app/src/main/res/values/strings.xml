@@ -1934,4 +1934,11 @@
   <string name="quick_start_page_deepseek_configure">Set up DeepSeek</string>
   <string name="setting_page_quick_start">Quick Start</string>
   <string name="setting_page_quick_start_desc">Set up providers and models step by step, or migrate from DeepSeek</string>
+  <string name="setting_display_page_icon_skin_title">图标颜色</string>
+  <string name="setting_display_page_icon_skin_desc">切换桌面图标颜色，部分桌面可能要等一会儿才刷新</string>
+  <string name="icon_skin_blue">蓝</string>
+  <string name="icon_skin_pink">粉</string>
+  <string name="icon_skin_purple">紫</string>
+  <string name="icon_skin_slate">灰</string>
+  <string name="icon_skin_gold">金</string>
 </resources>

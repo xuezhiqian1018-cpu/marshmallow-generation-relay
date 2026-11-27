@@ -18,6 +18,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -26,6 +27,7 @@ import me.rerere.rikkahub.R
 import me.rerere.rikkahub.data.datastore.AUTO_COMPRESS_THRESHOLD_RANGE
 import me.rerere.rikkahub.data.datastore.BackgroundEffectType
 import me.rerere.rikkahub.data.datastore.DisplaySetting
+import me.rerere.rikkahub.data.datastore.IconSkin
 import me.rerere.rikkahub.ui.components.nav.BackButton
 import me.rerere.rikkahub.ui.components.ui.CardGroup
 import me.rerere.rikkahub.ui.components.ui.CardGroupValue
@@ -34,6 +36,7 @@ import me.rerere.rikkahub.ui.components.ui.ConnectedChoiceLabel
 import me.rerere.rikkahub.ui.components.ui.switchItem
 import me.rerere.rikkahub.ui.hooks.rememberSharedPreferenceBoolean
 import me.rerere.rikkahub.ui.theme.CustomColors
+import me.rerere.rikkahub.utils.IconSkinUtil
 import me.rerere.rikkahub.utils.plus
 import org.koin.androidx.compose.koinViewModel
 
@@ -73,6 +76,38 @@ fun SettingPreferencesGeneralPage(vm: SettingVM = koinViewModel()) {
             contentPadding = contentPadding + PaddingValues(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            item {
+                val context = LocalContext.current
+                CardGroup(
+                    title = { Text(stringResource(R.string.setting_display_page_icon_skin_title)) },
+                ) {
+                    formItem(
+                        headlineContent = { Text(stringResource(R.string.setting_display_page_icon_skin_title)) },
+                        supportingContent = { Text(stringResource(R.string.setting_display_page_icon_skin_desc)) },
+                    ) {
+                        ConnectedChoiceButtons(
+                            options = IconSkin.entries,
+                            selected = settings.iconSkin,
+                            onSelect = { skin ->
+                                vm.updateSettings { latest -> latest.copy(iconSkin = skin) }
+                                IconSkinUtil.apply(context, skin)
+                            },
+                        ) { skin, selected ->
+                            ConnectedChoiceLabel(
+                                text = when (skin) {
+                                    IconSkin.BLUE -> stringResource(R.string.icon_skin_blue)
+                                    IconSkin.PINK -> stringResource(R.string.icon_skin_pink)
+                                    IconSkin.PURPLE -> stringResource(R.string.icon_skin_purple)
+                                    IconSkin.SLATE -> stringResource(R.string.icon_skin_slate)
+                                    IconSkin.GOLD -> stringResource(R.string.icon_skin_gold)
+                                },
+                                selected = selected,
+                            )
+                        }
+                    }
+                }
+            }
+
             item {
                 var createNewConversationOnStart by rememberSharedPreferenceBoolean(
                     "create_new_conversation_on_start",

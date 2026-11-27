@@ -32,6 +32,7 @@ data class Settings(
     val init: Boolean = false,
     val dynamicColor: Boolean = true,
     val themeId: String = PresetThemes[0].id,
+    val iconSkin: IconSkin = IconSkin.PINK,
     val customThemes: List<CustomTheme> = emptyList(),
     val developerMode: Boolean = false,
     val displaySetting: DisplaySetting = DisplaySetting(),
@@ -115,6 +116,33 @@ enum class ChatFontFamily {
 
     @SerialName("custom")
     CUSTOM,
+}
+
+@Serializable
+enum class IconSkin {
+    @SerialName("blue")
+    BLUE,
+
+    @SerialName("pink")
+    PINK,
+
+    @SerialName("purple")
+    PURPLE,
+
+    @SerialName("slate")
+    SLATE,
+
+    @SerialName("gold")
+    GOLD;
+
+    val aliasSuffix: String
+        get() = when (this) {
+            BLUE -> "IconBlue"
+            PINK -> "IconPink"
+            PURPLE -> "IconPurple"
+            SLATE -> "IconSlate"
+            GOLD -> "IconGold"
+        }
 }
 
 @Serializable
