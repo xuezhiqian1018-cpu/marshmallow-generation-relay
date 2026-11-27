@@ -101,6 +101,24 @@ private val TurnCheckpointInterval = 30.seconds
 // 距离上次压缩累计多少「轮」用户消息后自动压缩当前会话（简星：静默、只压当前窗口）
 private const val AUTO_COMPRESS_ROUNDS = 10
 
+/**
+ * 简星：把用户输入里的括号内容从正文剥离，转成明确的【本轮指令】块。
+ * 这样括号里的话是给叙事者的指令，不会被当成角色说出来的台词或动作。
+ * 无括号时原文不动。
+ */
+private fun formatBracketAsInstruction(input: String): String {
+    val regex = Regex("[（(]([^）)]*)[）)]")
+    val matches = regex.findAll(input).toList()
+    if (matches.isEmpty()) return input
+    val instructions = matches.map { it.groupValues[1].trim() }.filter { it.isNotEmpty() }
+    val body = regex.replace(input, "").trim()
+    return when {
+        instructions.isEmpty() -> body
+        body.isEmpty() -> "【本轮指令】\n" + instructions.joinToString("\n")
+        else -> "$body\n\n【本轮指令】\n" + instructions.joinToString("\n")
+    }
+}
+
 data class ChatError(
     val id: Uuid = Uuid.random(),
     val title: String? = null,
@@ -508,7 +526,18 @@ class ChatService(
                 finishInterruptedPendingTools(session)
 
                 val assistant = settingsStore.awaitLoaded().getStoredAssistantOf(session.state.value)
-                val processedContent = queued.parts.replaceUserRegexes(assistant)
+                val regexProcessed = queued.parts.replaceUserRegexes(assistant)
+                // 简星：设定提取读原文（含括号）；入库正文把括号剥离成【本轮指令】，不当角色台词
+                val originalTextForSetting = regexProcessed.joinToString("\n") { part ->
+                    if (part is UIMessagePart.Text) part.text else ""
+                }
+                val processedContent = regexProcessed.map { part ->
+                    if (part is UIMessagePart.Text) {
+                        part.copy(text = formatBracketAsInstruction(part.text))
+                    } else {
+                        part
+                    }
+                }
 
                 // 添加消息到列表
                 val previousIds = session.state.value.currentMessages.mapTo(HashSet()) { it.id }
@@ -529,17 +558,12 @@ class ChatService(
                 session.submittingMessage = null
 
                 // 简星：用户消息入库后，异步从括号/正文里提取「用户设定」写进当前会话系统提示词，失败静默
-                if (queued.answer) {
-                    val userTextForSetting = processedContent.joinToString("\n") { part ->
-                        if (part is UIMessagePart.Text) part.text else ""
-                    }
-                    if (userTextForSetting.isNotBlank()) {
-                        appScope.launch(Dispatchers.IO) {
-                            runCatching {
-                                extractAndMergeUserSetting(conversationId, userTextForSetting)
-                            }.onFailure { e ->
-                                Log.w(TAG, "User setting extraction failed (silent)", e)
-                            }
+                if (queued.answer && originalTextForSetting.isNotBlank()) {
+                    appScope.launch(Dispatchers.IO) {
+                        runCatching {
+                            extractAndMergeUserSetting(conversationId, originalTextForSetting)
+                        }.onFailure { e ->
+                            Log.w(TAG, "User setting extraction failed (silent)", e)
                         }
                     }
                 }
