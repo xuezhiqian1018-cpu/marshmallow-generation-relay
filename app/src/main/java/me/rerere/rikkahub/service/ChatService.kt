@@ -98,6 +98,9 @@ private const val TAG = "ChatService"
 // 一轮回复里连续调用工具可以跑很久，每隔这么久把已经执行完的步骤落一次库
 private val TurnCheckpointInterval = 30.seconds
 
+// 距离上次压缩累计多少「轮」用户消息后自动压缩当前会话（简星：静默、只压当前窗口）
+private const val AUTO_COMPRESS_ROUNDS = 10
+
 data class ChatError(
     val id: Uuid = Uuid.random(),
     val title: String? = null,
@@ -525,6 +528,22 @@ class ChatService(
                 session.flush()
                 session.submittingMessage = null
 
+                // 简星：用户消息入库后，异步从括号/正文里提取「用户设定」写进当前会话系统提示词，失败静默
+                if (queued.answer) {
+                    val userTextForSetting = processedContent.joinToString("\n") { part ->
+                        if (part is UIMessagePart.Text) part.text else ""
+                    }
+                    if (userTextForSetting.isNotBlank()) {
+                        appScope.launch(Dispatchers.IO) {
+                            runCatching {
+                                extractAndMergeUserSetting(conversationId, userTextForSetting)
+                            }.onFailure { e ->
+                                Log.w(TAG, "User setting extraction failed (silent)", e)
+                            }
+                        }
+                    }
+                }
+
                 // 开始补全
                 val result = if (queued.answer) runTurn(session) else null
 
@@ -746,7 +765,7 @@ class ChatService(
                             if (!canCompress || compressionUseless) return@pause false
                             // 同一条回复只试一次，压缩失败后接着它写时不再重试
                             if (message.id == session.autoCompressedReplyId) return@pause false
-                            if (!reachesAutoCompressThreshold(turn.model, message.contextTokens())) return@pause false
+                            if (!reachesMidTurnTokenLimit(turn.model, message.contextTokens())) return@pause false
                             if (freshReply && (message.stepCount ?: 0) <= 1) {
                                 compressionUseless = true
                                 return@pause false
@@ -917,6 +936,33 @@ class ChatService(
 
     // ---- 生成标题 ----
 
+    /**
+     * 简星：把本轮用户消息里的「用户设定」追加进当前会话系统提示词。
+     * 只追加不覆盖，用户仍可在会话系统提示词卡片里手动改；全程静默。
+     */
+    private suspend fun extractAndMergeUserSetting(conversationId: Uuid, userText: String) {
+        val settings = settingsStore.awaitLoaded()
+        val extracted = metaGenerator.extractUserSetting(settings, userText) ?: return
+        withLoadedSession<Unit>(conversationId) { session ->
+            val incarnation = session.incarnation
+            val current = session.state.value.customSystemPrompt.orEmpty()
+            val header = "【用户设定】"
+            val merged = if (current.isBlank()) {
+                "$header\n$extracted"
+            } else if (current.contains(header)) {
+                // 已有设定区：把新设定追加到设定区末尾（简单起见整段末尾追加，去重交给用户手改）
+                if (current.contains(extracted)) current else "$current\n$extracted"
+            } else {
+                "$current\n\n$header\n$extracted"
+            }
+            session.updateMetadata(
+                transform = { it.copy(customSystemPrompt = merged) },
+                persist = { conversationRepo.updateCustomSystemPrompt(conversationId, merged) },
+                expectedIncarnation = incarnation,
+            )
+        }
+    }
+
     suspend fun generateTitle(
         conversationId: Uuid,
         force: Boolean = false
@@ -1026,8 +1072,7 @@ class ChatService(
             val reply = conversation.currentMessages.lastOrNull { it.role == MessageRole.ASSISTANT } ?: return null
             if (reply.id == session.autoCompressedReplyId) return null
             // 已经压缩过的话检查点在回复之后，这里取到的是 null
-            val model = settings.getChatModelOf(conversation) ?: return null
-            if (!reachesAutoCompressThreshold(model, conversation.lastContextTokens())) return null
+            if (!reachesAutoCompressThreshold(conversation)) return null
 
             session.autoCompressedReplyId = reply.id
             return launchCompressionJob(
@@ -1038,9 +1083,8 @@ class ChatService(
                 clearSuggestions = false,
             ) { result ->
                 result.onFailure { e ->
-                    Log.w(TAG, "Auto compression failed", e)
-                    // 这一轮的回复已经完成，压缩失败不暂停队列；取消时 addError 会忽略
-                    addError(e, session.id, title = context.getString(R.string.error_title_auto_compress))
+                    // 简星：压缩静默，失败只记日志，不打扰用户
+                    Log.w(TAG, "Auto compression failed (silent)", e)
                 }
             }
         }
@@ -1064,7 +1108,7 @@ class ChatService(
         val delivered = AtomicBoolean(false)
         val deliver = { result: Result<Unit> -> if (delivered.compareAndSet(false, true)) onResult(result) }
         val job = launchGenerationJob(conversationId = session.id, activity = SessionActivity.Compressing) {
-            session.processingStatus.value = context.getString(R.string.chat_page_compressing)
+            // 简星：压缩静默，不显示「压缩中」
             try {
                 insertCompressionCheckpoint(session, additionalPrompt, keepRecentMessages, clearSuggestions)
                 deliver(Result.success(Unit))
@@ -1081,10 +1125,21 @@ class ChatService(
         return job
     }
 
-    private fun reachesAutoCompressThreshold(model: Model, contextTokens: Int?): Boolean {
+    /** 单轮工具链把上下文撑爆时的安全阀：按 token 占比，和每30轮的常规压缩无关。 */
+    private fun reachesMidTurnTokenLimit(model: Model, contextTokens: Int?): Boolean {
         val settings = settingsStore.settingsFlow.value
         if (!settings.enableAutoCompress || contextTokens == null || model.contextLength <= 0) return false
         return contextTokens >= model.contextLength * settings.autoCompressThreshold
+    }
+
+    /** 简星：按「轮」触发自动压缩。一轮=一条用户消息+回复；只数最近检查点之后的用户消息，会话之间互不影响。 */
+    private fun reachesAutoCompressThreshold(conversation: Conversation): Boolean {
+        val settings = settingsStore.settingsFlow.value
+        if (!settings.enableAutoCompress) return false
+        val current = conversation.currentMessages
+        val checkpointIndex = current.indexOfLast { it.isContextCheckpoint }
+        val rounds = current.drop(checkpointIndex + 1).count { it.role == MessageRole.USER }
+        return rounds >= AUTO_COMPRESS_ROUNDS
     }
 
     /**
@@ -1099,7 +1154,7 @@ class ChatService(
         // 压缩前把已经生成的内容存下来
         session.finishGeneration()
         session.setActivity(SessionActivity.Compressing)
-        session.processingStatus.value = context.getString(R.string.chat_page_compressing)
+        // 简星：压缩静默，不显示「压缩中」
         return try {
             insertCompressionCheckpoint(
                 session = session,
@@ -1111,8 +1166,8 @@ class ChatService(
             true
         } catch (e: Exception) {
             if (e is CancellationException) throw e
-            Log.w(TAG, "Mid-turn compression failed", e)
-            addError(e, session.id, title = context.getString(R.string.error_title_auto_compress))
+            // 简星：压缩静默，失败只记日志
+            Log.w(TAG, "Mid-turn compression failed (silent)", e)
             false
         } finally {
             session.processingStatus.value = null

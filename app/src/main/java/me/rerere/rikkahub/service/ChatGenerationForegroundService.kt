@@ -170,7 +170,7 @@ class ChatGenerationForegroundService : Service() {
                 getString(
                     when (generation.activity) {
                         SessionActivity.Generating -> R.string.notification_live_update_title
-                        SessionActivity.Compressing -> R.string.chat_page_compressing
+                        SessionActivity.Compressing -> R.string.app_name // 简星：压缩静默，通知只显示应用名
                     }
                 )
             )
