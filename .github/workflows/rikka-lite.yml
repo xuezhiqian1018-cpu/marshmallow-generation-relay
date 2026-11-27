@@ -1,0 +1,79 @@
+name: Build RikkaLite APK
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: jetbrains
+          java-version: "21"
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install web-ui deps
+        working-directory: web-ui
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Prepare fake google-services.json
+        run: |
+          cat > app/google-services.json << "JSONEOF"
+          {
+            "project_info": {
+              "project_number": "000000000000",
+              "project_id": "rikka-lite",
+              "storage_bucket": "rikka-lite.appspot.com"
+            },
+            "client": [{
+              "client_info": {
+                "mobilesdk_app_id": "1:000000000000:android:0000000000000000000000",
+                "android_client_info": { "package_name": "me.rerere.rikkahub" }
+              },
+              "api_key": [{ "current_key": "AIzaSyAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" }],
+              "services": { "analytics_service": { "status": 1 }, "appinvite_service": { "status": 1 } }
+            }],
+            "configuration_version": "1"
+          }
+          JSONEOF
+
+      - name: Prepare signing
+        run: |
+          echo "FgIHgQAAAQgAAQAB" > /dev/null
+          base64 -d << "KSEOF" > app/app.key
+          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
+          KSEOF
+          cat > local.properties << "LPEOF"
+          storeFile=app/app.key
+          storePassword=gongjuxing2026
+          keyAlias=gongjuxing
+          keyPassword=gongjuxing2026
+          LPEOF
+
+      - name: Build
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleGithubRelease --no-daemon
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: RikkaLite-apk
+          path: app/build/outputs/apk/github/release/*-arm64-v8a-release.apk
+          if-no-files-found: error
