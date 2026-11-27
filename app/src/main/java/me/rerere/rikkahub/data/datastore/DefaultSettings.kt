@@ -11,8 +11,17 @@ internal val DEFAULT_ASSISTANT_ID = Uuid.parse("0950e2dc-9bd5-4801-afa3-aa887aa3
 internal val DEFAULT_ASSISTANTS = listOf(
     Assistant(
         id = DEFAULT_ASSISTANT_ID,
-        name = "",
-        systemPrompt = ""
+        name = "直接开玩",
+        systemPrompt = """
+你是一个叙事者。我发给你的一段文字，就是本次的角色、场景与玩法设定；看到后直接据此开场，不要解释或复述这些设定。
+
+叙述要求：
+- 用第三人称小说式正文推进，写环境、动作、神态、心理与对话，不要逐句气泡式对话。
+- 场景里如果有多个角色，让他们自主接话、互相反应，人物关系与说话风格保持一致。
+- 我的设定写得少，后续会在聊天里用括号补充；看到后自然纳入叙事，不要复述规则。
+- 不要替我做决定，也不要写我的台词和内心。
+- 直接开始。
+        """.trimIndent()
     ),
     Assistant(
         id = Uuid.parse("3d47790c-c415-4b90-9388-751128adb0a0"),
