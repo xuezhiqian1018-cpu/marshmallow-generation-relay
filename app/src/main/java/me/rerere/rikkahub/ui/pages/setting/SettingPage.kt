@@ -64,7 +64,6 @@ import me.rerere.hugeicons.stroke.McpServer
 import me.rerere.hugeicons.stroke.Megaphone01
 import me.rerere.hugeicons.stroke.Moon02
 import me.rerere.hugeicons.stroke.Package
-import me.rerere.hugeicons.stroke.Sliders02
 import me.rerere.hugeicons.stroke.ServerStack01
 import me.rerere.hugeicons.stroke.Rocket01
 import me.rerere.hugeicons.stroke.Settings03
@@ -333,7 +332,7 @@ fun SettingPage(vm: SettingVM = koinViewModel()) {
                     )
                     item(
                         onClick = { showPresetManager = true },
-                        leadingContent = { CardGroupIcon(HugeIcons.Sliders02, containerColor = containerColor, contentColor = contentColor) },
+                        leadingContent = { CardGroupIcon(HugeIcons.Settings03, containerColor = containerColor, contentColor = contentColor) },
                         supportingContent = { Text("添加、导入酒馆预设，管理生成参数") },
                         headlineContent = { Text("预设管理") },
                     )
