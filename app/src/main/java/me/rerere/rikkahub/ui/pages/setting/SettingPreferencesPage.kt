@@ -3,7 +3,6 @@ package me.rerere.rikkahub.ui.pages.setting
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.LargeFlexibleTopAppBar
@@ -31,7 +30,7 @@ import me.rerere.hugeicons.stroke.PaintBoard
 import me.rerere.hugeicons.stroke.Refresh
 import me.rerere.hugeicons.stroke.Settings03
 import me.rerere.hugeicons.stroke.Sun01
-import me.rerere.hugeicons.stroke.Text
+import me.rerere.hugeicons.stroke.ScanText
 import me.rerere.rikkahub.R
 import me.rerere.rikkahub.Screen
 import me.rerere.rikkahub.ui.components.nav.BackButton
@@ -177,7 +176,7 @@ fun SettingPreferencesPage(vm: SettingVM = koinViewModel()) {
 
                     // 聊天字体大小 -> 界面偏好页（字号），显示真实百分比
                     prefRow(
-                        icon = HugeIcons.Text,
+                        icon = HugeIcons.ScanText,
                         label = "聊天字体大小",
                         value = "${(display.fontSizeRatio * 100).toInt()}%",
                     ) { navController.navigate(Screen.SettingPreferencesUI) }
