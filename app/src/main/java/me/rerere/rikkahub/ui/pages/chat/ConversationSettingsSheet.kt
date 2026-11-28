@@ -39,6 +39,7 @@ import me.rerere.rikkahub.R
 import me.rerere.rikkahub.Screen
 import me.rerere.rikkahub.data.datastore.Settings
 import me.rerere.rikkahub.data.model.Assistant
+import me.rerere.rikkahub.data.model.GenerationPreset
 import me.rerere.rikkahub.data.model.Conversation
 import me.rerere.rikkahub.ui.context.LocalNavController
 import me.rerere.rikkahub.ui.pages.assistant.detail.BackgroundPicker
@@ -61,6 +62,7 @@ fun ConversationSettingsSheet(
     onUpdateTitle: (String) -> Unit,
     onUpdateConversationSystemPrompt: (String?) -> Unit,
     onUpdateAssistant: (Assistant) -> Unit,
+    onSavePresets: (List<GenerationPreset>) -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val navigator = LocalNavController.current
@@ -70,6 +72,7 @@ fun ConversationSettingsSheet(
         mutableStateOf(conversation.customSystemPrompt ?: "")
     }
     var promptInput by remember(assistant.id) { mutableStateOf(assistant.systemPrompt) }
+    var showPresetSheet by remember { mutableStateOf(false) }
 
     fun commitAndClose() {
         onUpdateTitle(titleInput)
@@ -119,7 +122,7 @@ fun ConversationSettingsSheet(
                 SettingRow(
                     icon = HugeIcons.Message02,
                     label = stringResource(R.string.conversation_settings_preset),
-                ) { navigator.navigate(Screen.AssistantPrompt(assistant.id.toString())) }
+                ) { showPresetSheet = true }
                 SettingRow(
                     icon = HugeIcons.Brain02,
                     label = stringResource(R.string.conversation_settings_memory),
@@ -193,6 +196,28 @@ fun ConversationSettingsSheet(
                 Text("完成")
             }
         }
+    }
+
+    if (showPresetSheet) {
+        PresetManagerSheet(
+            presets = settings.generationPresets,
+            assistant = assistant,
+            onDismiss = { showPresetSheet = false },
+            onSavePresets = onSavePresets,
+            onApplyPreset = { preset ->
+                onUpdateAssistant(
+                    assistant.copy(
+                        temperature = preset.temperature,
+                        topP = preset.topP,
+                        maxTokens = preset.maxTokens,
+                        streamOutput = preset.streamOutput,
+                        contextMessageLimit = preset.contextMessageLimit,
+                        systemPrompt = preset.systemPrompt,
+                    )
+                )
+                promptInput = preset.systemPrompt
+            },
+        )
     }
 }
 
