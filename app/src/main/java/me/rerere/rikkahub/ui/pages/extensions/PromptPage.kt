@@ -1,5 +1,8 @@
 package me.rerere.rikkahub.ui.pages.extensions
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
@@ -62,6 +65,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -72,6 +76,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import me.rerere.ai.core.MessageRole
 import me.rerere.hugeicons.HugeIcons
 import me.rerere.hugeicons.stroke.Add01
@@ -107,6 +117,7 @@ import me.rerere.rikkahub.ui.components.ui.TagType
 import me.rerere.rikkahub.ui.components.ui.cardGroupItemShape
 import me.rerere.rikkahub.ui.components.ui.longPressReorder
 import me.rerere.rikkahub.ui.context.LocalToaster
+import me.rerere.rikkahub.utils.JsonInstant
 import me.rerere.rikkahub.ui.hooks.useEditState
 import me.rerere.rikkahub.ui.theme.CustomColors
 import me.rerere.rikkahub.utils.plus
@@ -260,6 +271,9 @@ private fun ModeInjectionTab(
             leadingContent = {
                 IconButton(onClick = { importer.importFromFile() }) {
                     Icon(HugeIcons.FileImport, null)
+                }
+                IconButton(onClick = { tavernWorldLauncher.launch("application/json") }) {
+                    Icon(HugeIcons.Book01, "导入酒馆世界书")
                 }
             },
         ) {
@@ -617,6 +631,19 @@ private fun LorebookTab(
             toaster.show(importSuccessMsg)
         }.onFailure { error ->
             toaster.show(importFailedMsg.format(error.message))
+        }
+    }
+    val context = LocalContext.current
+    val tavernWorldLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        try {
+            val text = context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+                ?: error("无法读取文件")
+            val books = parseTavernWorldInfo(text)
+            onUpdate(currentLorebooks + books)
+            toaster.show("已导入酒馆世界书：${books.sumOf { it.entries.size }} 条")
+        } catch (e: Exception) {
+            toaster.show("酒馆世界书导入失败：${e.message ?: "格式不对"}")
         }
     }
 
@@ -1220,5 +1247,52 @@ private fun RegexInjectionEditDialog(
                 Text(stringResource(R.string.prompt_page_cancel))
             }
         }
+    )
+}
+
+private fun parseTavernWorldInfo(text: String): List<Lorebook> {
+    val root: JsonElement = JsonInstant.parseToJsonElement(text)
+    val array: JsonArray = when (root) {
+        is JsonArray -> root
+        is JsonObject -> (root["entries"] ?: root["worldInfo"]) as? JsonArray
+            ?: error("未找到世界书条目")
+        else -> error("不是酒馆世界书文件")
+    }
+    val now = java.util.UUID.randomUUID().toString()
+    val entries = array.mapIndexed { index, element ->
+        val obj = element as? JsonObject ?: return@mapIndexed PromptInjection.RegexInjection(
+            name = "条目 ${index + 1}",
+            content = element.toString(),
+        )
+        fun str(name: String): String = obj[name]?.runCatching { jsonPrimitive.content }?.getOrNull() ?: ""
+        fun num(name: String, default: Int): Int = obj[name]?.runCatching { jsonPrimitive.content.toIntOrNull() }?.getOrNull() ?: default
+        fun bool(name: String, default: Boolean): Boolean = obj[name]?.runCatching { jsonPrimitive.content.toBooleanStrictOrNull() }?.getOrNull() ?: default
+        val keywords = (obj["key"] as? JsonArray)?.mapNotNull { it.runCatching { jsonPrimitive.content }.getOrNull() }
+            ?: (obj["keys"] as? JsonArray)?.mapNotNull { it.runCatching { jsonPrimitive.content }.getOrNull() }
+            ?: emptyList()
+        val position = when (num("position", 0)) {
+            4 -> InjectionPosition.AT_DEPTH
+            else -> InjectionPosition.AFTER_SYSTEM_PROMPT
+        }
+        PromptInjection.RegexInjection(
+            name = str("comments").ifBlank { keywords.firstOrNull() ?: "条目 ${index + 1}" },
+            enabled = !bool("disable", false),
+            priority = num("order", 100),
+            position = position,
+            content = str("content"),
+            injectDepth = num("depth", 4),
+            role = MessageRole.USER,
+            keywords = keywords,
+            caseSensitive = bool("caseSensitive", false),
+            scanDepth = num("scanDepth", 4),
+            constantActive = bool("constant", false),
+        )
+    }.filter { it.content.isNotBlank() || it.keywords.isNotEmpty() }
+    return listOf(
+        Lorebook(
+            name = "酒馆世界书 $now",
+            description = "从酒馆世界书 JSON 导入",
+            entries = entries,
+        )
     )
 }
