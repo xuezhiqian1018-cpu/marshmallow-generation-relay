@@ -58,6 +58,8 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -182,6 +184,7 @@ fun SettingProviderDetailPage(id: Uuid, vm: SettingVM = koinViewModel()) {
     val navController = LocalNavController.current
     val provider = settings.providers.find { it.id == id } ?: return
     val pager = rememberPagerState { ProviderDetailTab.entries.size }
+    val detailScope = rememberCoroutineScope()
     val toaster = LocalToaster.current
     val context = LocalContext.current
 
@@ -238,6 +241,25 @@ fun SettingProviderDetailPage(id: Uuid, vm: SettingVM = koinViewModel()) {
                 }
             )
         },
+        // 参考图布局：底部固定「配置 / 模型」两个标签（图标在上、文字在下）
+        bottomBar = {
+            NavigationBar(
+                containerColor = MaterialTheme.colorScheme.surfaceContainer,
+            ) {
+                NavigationBarItem(
+                    selected = pager.currentPage == 0,
+                    onClick = { detailScope.launch { pager.animateScrollToPage(0) } },
+                    icon = { Icon(HugeIcons.Tools, contentDescription = null) },
+                    label = { Text("配置") },
+                )
+                NavigationBarItem(
+                    selected = pager.currentPage == 1,
+                    onClick = { detailScope.launch { pager.animateScrollToPage(1) } },
+                    icon = { Icon(HugeIcons.Package01, contentDescription = null) },
+                    label = { Text("模型") },
+                )
+            }
+        },
     ) {
         Column(
             modifier = Modifier
@@ -245,13 +267,6 @@ fun SettingProviderDetailPage(id: Uuid, vm: SettingVM = koinViewModel()) {
                 .padding(it)
                 .consumeWindowInsets(it)
         ) {
-            PagerTabs(
-                pagerState = pager,
-                tabs = ProviderDetailTab.entries,
-                modifier = Modifier.padding(vertical = 4.dp),
-                contentPadding = PaddingValues(horizontal = 16.dp),
-            )
-
             HorizontalPager(
                 state = pager,
                 modifier = Modifier
@@ -271,7 +286,10 @@ fun SettingProviderDetailPage(id: Uuid, vm: SettingVM = koinViewModel()) {
                             },
                             onDelete = {
                                 onDelete()
-                            }
+                            },
+                            onOpenAdvanced = {
+                                detailScope.launch { pager.animateScrollToPage(2) }
+                            },
                         )
                     }
 
@@ -298,7 +316,8 @@ fun SettingProviderDetailPage(id: Uuid, vm: SettingVM = koinViewModel()) {
 private fun SettingProviderConfigPage(
     provider: ProviderSetting,
     onEdit: (ProviderSetting) -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onOpenAdvanced: () -> Unit,
 ) {
     var internalProvider by remember(provider) { mutableStateOf(provider) }
     var showDeleteDialog by remember { mutableStateOf(false) }
@@ -340,6 +359,27 @@ private fun SettingProviderConfigPage(
                     } else null,
                     onEdit = { internalProvider = apiKeyProvider.withQuotaQuery(it) }
                 )
+            }
+
+            // 高级设置入口（自定义请求头），参考图底部只显示配置/模型两项，高级设置从这里进
+            Surface(
+                onClick = { onOpenAdvanced() },
+                shape = RoundedCornerShape(20.dp),
+                color = CustomColors.listItemColors.containerColor,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Icon(HugeIcons.Settings03, contentDescription = null)
+                    Text("高级设置", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                    androidx.compose.material3.Icon(
+                        HugeIcons.ArrowRight01,
+                        contentDescription = null,
+                    )
+                }
             }
 
             // 硅基流动图标
