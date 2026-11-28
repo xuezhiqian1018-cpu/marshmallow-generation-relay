@@ -310,6 +310,8 @@ private fun ChatPageContent(
     var showDeleteConfirm by remember { mutableStateOf(false) }
     val hazeState = rememberHazeState()
     var showFilesSheet by remember { mutableStateOf(false) }
+    // 简星：对话设置面板（输入框齿轮打开）
+    var showSettingsSheet by remember { mutableStateOf(false) }
     val attachmentPickerActions = rememberChatAttachmentPickerActions(
         inputState = inputState,
         setting = setting,
@@ -445,6 +447,9 @@ private fun ChatPageContent(
                     },
                     onUpdateChatModel = vm::setChatModel,
                     onUpdateAssistant = vm::updateAssistant,
+                    onSettingsClick = {
+                        showSettingsSheet = true
+                    },
                     onMoreClick = {
                         showFilesSheet = true
                     },
@@ -551,6 +556,18 @@ private fun ChatPageContent(
                 attachmentPickerActions = attachmentPickerActions,
                 onStartVoiceMode = onStartVoiceMode,
                 onDismiss = { showFilesSheet = false },
+            )
+        }
+
+        // 简星：对话设置面板（输入框齿轮打开），所有字段接真实数据
+        if (showSettingsSheet) {
+            ConversationSettingsSheet(
+                conversation = conversation,
+                assistant = assistant,
+                onDismiss = { showSettingsSheet = false },
+                onUpdateTitle = { vm.updateTitle(it) },
+                onUpdateConversationSystemPrompt = { vm.updateConversationSystemPrompt(it) },
+                onUpdateAssistant = { vm.updateAssistant(it) },
             )
         }
     }
