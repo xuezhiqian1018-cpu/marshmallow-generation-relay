@@ -204,6 +204,8 @@ fun ConversationSettingsSheet(
             assistant = assistant,
             onDismiss = { showPresetSheet = false },
             onSavePresets = onSavePresets,
+            // 窗口里只切换启用，不在窗口添加/删除
+            manageOnly = false,
             onApplyPreset = { preset ->
                 onUpdateAssistant(
                     assistant.copy(
