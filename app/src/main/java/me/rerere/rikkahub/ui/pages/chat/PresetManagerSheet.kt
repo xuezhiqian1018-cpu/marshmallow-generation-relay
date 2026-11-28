@@ -53,6 +53,8 @@ fun PresetManagerSheet(
     onDismiss: () -> Unit,
     onSavePresets: (List<GenerationPreset>) -> Unit,
     onApplyPreset: (GenerationPreset) -> Unit,
+    // true=设置页管理模式（导入/保存/删除都显示）；false=对话窗口只切换启用
+    manageOnly: Boolean = true,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
     val context: Context = LocalContext.current
@@ -88,7 +90,7 @@ fun PresetManagerSheet(
 
             if (presets.isEmpty()) {
                 Text(
-                    text = "还没有预设。把当前参数保存下来，之后一键切换。",
+                    text = if (manageOnly) "还没有预设。把当前参数保存下来，之后一键切换。" else "还没有预设，请到设置 → 预设管理里添加。",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -113,11 +115,13 @@ fun PresetManagerSheet(
                                     else MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             },
-                            trailingContent = {
-                                IconButton(onClick = { pendingDelete = preset }) {
-                                    Icon(HugeIcons.Delete01, contentDescription = "删除预设")
+                            trailingContent = if (manageOnly) {
+                                {
+                                    IconButton(onClick = { pendingDelete = preset }) {
+                                        Icon(HugeIcons.Delete01, contentDescription = "删除预设")
+                                    }
                                 }
-                            },
+                            } else null,
                             modifier = Modifier.clickable {
                                 onApplyPreset(preset)
                                 onDismiss()
@@ -127,42 +131,44 @@ fun PresetManagerSheet(
                 }
             }
 
-            TextButton(
-                onClick = { importLauncher.launch("application/json") },
-                modifier = Modifier.fillMaxWidth(),
-            ) { Text("导入酒馆预设 JSON") }
+            if (manageOnly) {
+                TextButton(
+                    onClick = { importLauncher.launch("application/json") },
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text("导入酒馆预设 JSON") }
 
-            if (importError != null) {
-                Text(importError!!, color = MaterialTheme.colorScheme.error)
-            }
+                if (importError != null) {
+                    Text(importError!!, color = MaterialTheme.colorScheme.error)
+                }
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                OutlinedTextField(
-                    value = newName,
-                    onValueChange = { newName = it },
-                    label = { Text("预设名") },
-                    singleLine = true,
-                    modifier = Modifier.weight(1f),
-                )
-                Button(
-                    onClick = {
-                        val preset = GenerationPreset(
-                            name = newName.ifBlank { "预设 ${presets.size + 1}" },
-                            temperature = assistant.temperature,
-                            topP = assistant.topP,
-                            maxTokens = assistant.maxTokens,
-                            streamOutput = assistant.streamOutput,
-                            contextMessageLimit = assistant.contextMessageLimit,
-                            systemPrompt = assistant.systemPrompt,
-                        )
-                        onSavePresets(presets + preset)
-                        newName = "预设 ${presets.size + 2}"
-                    },
-                ) { Text("保存当前") }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    OutlinedTextField(
+                        value = newName,
+                        onValueChange = { newName = it },
+                        label = { Text("预设名") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Button(
+                        onClick = {
+                            val preset = GenerationPreset(
+                                name = newName.ifBlank { "预设 ${presets.size + 1}" },
+                                temperature = assistant.temperature,
+                                topP = assistant.topP,
+                                maxTokens = assistant.maxTokens,
+                                streamOutput = assistant.streamOutput,
+                                contextMessageLimit = assistant.contextMessageLimit,
+                                systemPrompt = assistant.systemPrompt,
+                            )
+                            onSavePresets(presets + preset)
+                            newName = "预设 ${presets.size + 2}"
+                        },
+                    ) { Text("保存当前") }
+                }
             }
         }
     }
