@@ -64,6 +64,7 @@ import me.rerere.hugeicons.stroke.McpServer
 import me.rerere.hugeicons.stroke.Megaphone01
 import me.rerere.hugeicons.stroke.Moon02
 import me.rerere.hugeicons.stroke.Package
+import me.rerere.hugeicons.stroke.Sliders02
 import me.rerere.hugeicons.stroke.ServerStack01
 import me.rerere.hugeicons.stroke.Rocket01
 import me.rerere.hugeicons.stroke.Settings03
@@ -75,10 +76,12 @@ import me.rerere.hugeicons.stroke.WavingHand01
 import me.rerere.rikkahub.R
 import me.rerere.rikkahub.Screen
 import me.rerere.rikkahub.data.datastore.isNotConfigured
+import me.rerere.rikkahub.data.model.Assistant
 import me.rerere.rikkahub.data.files.FilesManager
 import me.rerere.rikkahub.ui.components.nav.BackButton
 import me.rerere.rikkahub.ui.components.ui.CardGroup
 import me.rerere.rikkahub.ui.components.ui.CardGroupIcon
+import me.rerere.rikkahub.ui.pages.chat.PresetManagerSheet
 import me.rerere.rikkahub.ui.components.ui.ConnectedChoiceButtons
 import me.rerere.rikkahub.ui.components.ui.ConnectedChoiceLabel
 import me.rerere.rikkahub.ui.components.ui.permission.LocalNetworkPermissionCard
@@ -125,6 +128,8 @@ fun SettingPage(vm: SettingVM = koinViewModel()) {
         onTertiaryContainer = Color(0xFF3C4043),
     )
     var searchQuery by remember { mutableStateOf("") }
+    // 预设管理（添加/导入/删除在设置页做；窗口里只切换启用）
+    var showPresetManager by remember { mutableStateOf(false) }
     fun matches(text: String): Boolean = searchQuery.isBlank() || text.contains(searchQuery, ignoreCase = true)
     val showGeneral = matches(stringResource(R.string.setting_page_general_settings)) ||
         matches(stringResource(R.string.setting_page_color_mode)) ||
@@ -134,7 +139,8 @@ fun SettingPage(vm: SettingVM = koinViewModel()) {
         matches(stringResource(R.string.setting_page_default_model)) ||
         matches(stringResource(R.string.setting_page_providers)) ||
         matches(stringResource(R.string.setting_page_tts_service)) ||
-        matches(stringResource(R.string.setting_page_web_server))
+        matches(stringResource(R.string.setting_page_web_server)) ||
+        matches("预设管理")
     val showData = matches(stringResource(R.string.setting_page_data_settings)) ||
         matches(stringResource(R.string.setting_page_data_backup)) ||
         matches(stringResource(R.string.setting_page_chat_storage))
@@ -326,6 +332,12 @@ fun SettingPage(vm: SettingVM = koinViewModel()) {
                         headlineContent = { Text(stringResource(R.string.setting_page_default_model)) },
                     )
                     item(
+                        onClick = { showPresetManager = true },
+                        leadingContent = { CardGroupIcon(HugeIcons.Sliders02, containerColor = containerColor, contentColor = contentColor) },
+                        supportingContent = { Text("添加、导入酒馆预设，管理生成参数") },
+                        headlineContent = { Text("预设管理") },
+                    )
+                    item(
                         onClick = { navController.navigate(Screen.SettingProvider) },
                         leadingContent = { CardGroupIcon(HugeIcons.Brain02, containerColor = containerColor, contentColor = contentColor) },
                         supportingContent = { Text(stringResource(R.string.setting_page_providers_desc)) },
@@ -492,6 +504,39 @@ fun SettingPage(vm: SettingVM = koinViewModel()) {
                 }
             }
             }
+        }
+
+        if (showPresetManager) {
+            val currentAssistant: Assistant = settings.assistants.find { it.id == settings.assistantId }
+                ?: settings.assistants.firstOrNull()
+                ?: Assistant()
+            PresetManagerSheet(
+                presets = settings.generationPresets,
+                assistant = currentAssistant,
+                onDismiss = { showPresetManager = false },
+                onSavePresets = { presets ->
+                    vm.updateSettings { it.copy(generationPresets = presets) }
+                },
+                onApplyPreset = { preset ->
+                    vm.updateSettings { latest ->
+                        latest.copy(
+                            assistants = latest.assistants.map { a ->
+                                if (a.id == latest.assistantId) {
+                                    a.copy(
+                                        temperature = preset.temperature,
+                                        topP = preset.topP,
+                                        maxTokens = preset.maxTokens,
+                                        streamOutput = preset.streamOutput,
+                                        contextMessageLimit = preset.contextMessageLimit,
+                                        systemPrompt = preset.systemPrompt,
+                                    )
+                                } else a
+                            }
+                        )
+                    }
+                },
+                manageOnly = true,
+            )
         }
     }
     }
