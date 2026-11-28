@@ -564,6 +564,7 @@ private fun ChatPageContent(
             ConversationSettingsSheet(
                 conversation = conversation,
                 assistant = assistant,
+                settings = setting,
                 onDismiss = { showSettingsSheet = false },
                 onUpdateTitle = { vm.updateTitle(it) },
                 onUpdateConversationSystemPrompt = { vm.updateConversationSystemPrompt(it) },
