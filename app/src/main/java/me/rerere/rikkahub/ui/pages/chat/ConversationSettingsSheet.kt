@@ -3,6 +3,7 @@ package me.rerere.rikkahub.ui.pages.chat
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -26,6 +28,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import me.rerere.hugeicons.HugeIcons
@@ -34,26 +37,26 @@ import me.rerere.hugeicons.stroke.Brain02
 import me.rerere.hugeicons.stroke.Message02
 import me.rerere.rikkahub.R
 import me.rerere.rikkahub.Screen
+import me.rerere.rikkahub.data.datastore.Settings
 import me.rerere.rikkahub.data.model.Assistant
 import me.rerere.rikkahub.data.model.Conversation
-import me.rerere.rikkahub.ui.pages.assistant.detail.BackgroundPicker
 import me.rerere.rikkahub.ui.context.LocalNavController
+import me.rerere.rikkahub.ui.pages.assistant.detail.BackgroundPicker
 import kotlin.math.roundToInt
 
 /**
  * 简星「对话设置」面板：从聊天输入框工具栏的齿轮打开。
  *
- * 所有字段接真实数据、真实生效：
- * - 名称 -> vm.updateTitle
- * - 指令(对话级系统提示) -> vm.updateConversationSystemPrompt
- * - 提示词(助手系统提示) / 模型参数 / 背景 -> vm.updateAssistant(assistant.copy(...))
- * - 世界书 / 预设 / 记忆 -> 跳转已有页面（传助手 id）
+ * 布局按用户给的参考图：基本（名称 / 指令）、简星（指令注入 / 世界书 / 预设 / 记忆）、
+ * 模型参数（左标题＋右控件，数值在右，滑块在下）、背景 / 前景、底部完成。
+ * 所有字段接真实数据、真实生效。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ConversationSettingsSheet(
     conversation: Conversation,
     assistant: Assistant,
+    settings: Settings,
     onDismiss: () -> Unit,
     onUpdateTitle: (String) -> Unit,
     onUpdateConversationSystemPrompt: (String?) -> Unit,
@@ -62,23 +65,21 @@ fun ConversationSettingsSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val navigator = LocalNavController.current
 
-    // 名称：本地编辑，离开焦点/确认时写回，避免每敲一个字都落库
     var titleInput by remember(conversation.id) { mutableStateOf(conversation.title) }
-    // 指令：对话级系统提示
     var instructionInput by remember(conversation.id) {
         mutableStateOf(conversation.customSystemPrompt ?: "")
     }
-    // 提示词：助手级系统提示
     var promptInput by remember(assistant.id) { mutableStateOf(assistant.systemPrompt) }
 
+    fun commitAndClose() {
+        onUpdateTitle(titleInput)
+        onUpdateConversationSystemPrompt(instructionInput.ifBlank { null })
+        onUpdateAssistant(assistant.copy(systemPrompt = promptInput))
+        onDismiss()
+    }
+
     ModalBottomSheet(
-        onDismissRequest = {
-            // 关闭前把正在编辑的文本落库，保证真实生效
-            onUpdateTitle(titleInput)
-            onUpdateConversationSystemPrompt(instructionInput.ifBlank { null })
-            onUpdateAssistant(assistant.copy(systemPrompt = promptInput))
-            onDismiss()
-        },
+        onDismissRequest = { commitAndClose() },
         sheetState = sheetState,
     ) {
         Column(
@@ -94,123 +95,79 @@ fun ConversationSettingsSheet(
                 style = MaterialTheme.typography.headlineSmall,
             )
 
-            // 名称
+            // 基本
+            SectionTitle("基本")
             SettingCard {
-                OutlinedTextField(
-                    value = titleInput,
-                    onValueChange = { titleInput = it },
-                    label = { Text(stringResource(R.string.assistant_page_name)) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
+                LabeledField("名称", titleInput) { titleInput = it }
+                LabeledField("指令", instructionInput, minLines = 3, maxLines = 8) { instructionInput = it }
+                LabeledField("提示词", promptInput, minLines = 3, maxLines = 10) { promptInput = it }
             }
 
-            // 指令（对话级系统提示）
+            // 简星：指令注入 / 世界书 / 预设 / 记忆
+            SectionTitle("简星")
             SettingCard {
-                Text(
-                    text = stringResource(R.string.conversation_settings_instruction),
-                    style = MaterialTheme.typography.titleSmall,
-                )
-                OutlinedTextField(
-                    value = instructionInput,
-                    onValueChange = { instructionInput = it },
-                    label = { Text(stringResource(R.string.chat_page_conversation_system_prompt)) },
-                    minLines = 3,
-                    maxLines = 8,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-
-            // 提示词（助手级系统提示）
-            SettingCard {
-                Text(
-                    text = stringResource(R.string.conversation_settings_prompt),
-                    style = MaterialTheme.typography.titleSmall,
-                )
-                OutlinedTextField(
-                    value = promptInput,
-                    onValueChange = { promptInput = it },
-                    minLines = 3,
-                    maxLines = 10,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-
-            // 世界书 / 预设 / 记忆：跳转已有页面，真实可用
-            SettingCard {
-                SettingRow(
+                CountRow(
+                    icon = HugeIcons.Message02,
+                    label = "指令注入",
+                    count = "${assistant.modeInjectionIds.size}/${settings.modeInjections.size}",
+                ) { navigator.navigate(Screen.AssistantInjections(assistant.id.toString())) }
+                CountRow(
                     icon = HugeIcons.Book01,
-                    label = stringResource(R.string.conversation_settings_lorebook),
-                ) {
-                    navigator.navigate(Screen.AssistantInjections(assistant.id.toString()))
-                }
+                    label = "世界书",
+                    count = "${assistant.lorebookIds.size}/${settings.lorebooks.size}",
+                ) { navigator.navigate(Screen.AssistantInjections(assistant.id.toString())) }
                 SettingRow(
                     icon = HugeIcons.Message02,
                     label = stringResource(R.string.conversation_settings_preset),
-                ) {
-                    navigator.navigate(Screen.AssistantPrompt(assistant.id.toString()))
-                }
+                ) { navigator.navigate(Screen.AssistantPrompt(assistant.id.toString())) }
                 SettingRow(
                     icon = HugeIcons.Brain02,
                     label = stringResource(R.string.conversation_settings_memory),
-                ) {
-                    navigator.navigate(Screen.AssistantMemory(assistant.id.toString()))
-                }
+                ) { navigator.navigate(Screen.AssistantMemory(assistant.id.toString())) }
             }
 
-            // 模型参数
+            // 模型参数：Kelivo 格式（左标题＋右控件，数值在右，滑块在下）
+            SectionTitle("模型参数")
             SettingCard {
-                Text(
-                    text = stringResource(R.string.conversation_settings_model_params),
-                    style = MaterialTheme.typography.titleSmall,
-                )
+                SettingRow(
+                    icon = HugeIcons.Brain02,
+                    label = "模型",
+                    value = assistant.name.ifBlank { "默认模型" },
+                ) { navigator.navigate(Screen.SettingModels) }
+
+                SliderRow(
+                    label = stringResource(R.string.assistant_page_temperature),
+                    value = assistant.temperature ?: 1.0f,
+                    range = 0f..2f,
+                ) { onUpdateAssistant(assistant.copy(temperature = it)) }
+
+                SliderRow(
+                    label = stringResource(R.string.assistant_page_top_p),
+                    value = assistant.topP ?: 1.0f,
+                    range = 0f..1f,
+                ) { onUpdateAssistant(assistant.copy(topP = it)) }
+
+                SliderRow(
+                    label = stringResource(R.string.assistant_page_max_tokens),
+                    value = (assistant.maxTokens ?: 2048).toFloat(),
+                    range = 0f..128000f,
+                    integer = true,
+                ) { onUpdateAssistant(assistant.copy(maxTokens = it.roundToInt())) }
 
                 SwitchRow(
                     label = stringResource(R.string.assistant_page_stream_output),
                     checked = assistant.streamOutput,
                 ) { onUpdateAssistant(assistant.copy(streamOutput = it)) }
 
-                NumberParamRow(
-                    label = stringResource(R.string.assistant_page_temperature),
-                    enabled = assistant.temperature != null,
-                    value = assistant.temperature ?: 1.0f,
-                    range = 0f..2f,
-                    onToggle = { on -> onUpdateAssistant(assistant.copy(temperature = if (on) 1.0f else null)) },
-                    onValue = { onUpdateAssistant(assistant.copy(temperature = it)) },
-                )
-
-                NumberParamRow(
-                    label = stringResource(R.string.assistant_page_top_p),
-                    enabled = assistant.topP != null,
-                    value = assistant.topP ?: 1.0f,
-                    range = 0f..1f,
-                    onToggle = { on -> onUpdateAssistant(assistant.copy(topP = if (on) 1.0f else null)) },
-                    onValue = { onUpdateAssistant(assistant.copy(topP = it)) },
-                )
-
-                NumberParamRow(
-                    label = stringResource(R.string.assistant_page_max_tokens),
-                    enabled = assistant.maxTokens != null,
-                    value = (assistant.maxTokens ?: 2048).toFloat(),
-                    range = 0f..128000f,
-                    onToggle = { on -> onUpdateAssistant(assistant.copy(maxTokens = if (on) 2048 else null)) },
-                    onValue = { onUpdateAssistant(assistant.copy(maxTokens = it.roundToInt())) },
-                )
-
                 SwitchRow(
                     label = stringResource(R.string.assistant_page_context_message_limit),
                     checked = assistant.contextMessageLimit > 0,
-                ) { on ->
-                    onUpdateAssistant(assistant.copy(contextMessageLimit = if (on) 20 else 0))
-                }
+                ) { onUpdateAssistant(assistant.copy(contextMessageLimit = if (it) 20 else 0)) }
             }
 
-            // 背景
+            // 背景 / 前景
+            SectionTitle("背景")
             SettingCard {
-                Text(
-                    text = stringResource(R.string.conversation_settings_background),
-                    style = MaterialTheme.typography.titleSmall,
-                )
                 BackgroundPicker(
                     background = assistant.background,
                     backgroundOpacity = assistant.backgroundOpacity,
@@ -223,19 +180,33 @@ fun ConversationSettingsSheet(
                     )
                     Slider(
                         value = assistant.backgroundOpacity.coerceIn(0f, 1f),
-                        onValueChange = {
-                            onUpdateAssistant(assistant.copy(backgroundOpacity = it))
-                        },
+                        onValueChange = { onUpdateAssistant(assistant.copy(backgroundOpacity = it)) },
                         valueRange = 0f..1f,
                     )
                 }
+            }
+
+            Button(
+                onClick = { commitAndClose() },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("完成")
             }
         }
     }
 }
 
 @Composable
-private fun SettingCard(content: @Composable () -> Unit) {
+private fun SectionTitle(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.titleSmall,
+        color = MaterialTheme.colorScheme.primary,
+    )
+}
+
+@Composable
+private fun SettingCard(content: @Composable ColumnScope.() -> Unit) {
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         shape = MaterialTheme.shapes.large,
@@ -243,30 +214,78 @@ private fun SettingCard(content: @Composable () -> Unit) {
     ) {
         Column(
             modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            content()
-        }
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            content = content,
+        )
+    }
+}
+
+@Composable
+private fun LabeledField(
+    label: String,
+    value: String,
+    minLines: Int = 1,
+    maxLines: Int = 1,
+    onValueChange: (String) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(label, style = MaterialTheme.typography.labelLarge)
+        OutlinedTextField(
+            value = value,
+            onValueChange = onValueChange,
+            minLines = minLines,
+            maxLines = maxLines,
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
 }
 
 @Composable
 private fun SettingRow(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector,
     label: String,
+    value: String? = null,
     onClick: () -> Unit,
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(vertical = 10.dp),
+            .padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
         Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+        if (value != null) {
+            Text(
+                value,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         Text("›", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun CountRow(
+    icon: ImageVector,
+    label: String,
+    count: String,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
+        Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+        Text(count, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
     }
 }
 
@@ -287,27 +306,29 @@ private fun SwitchRow(
 }
 
 @Composable
-private fun NumberParamRow(
+private fun SliderRow(
     label: String,
-    enabled: Boolean,
     value: Float,
     range: ClosedFloatingPointRange<Float>,
-    onToggle: (Boolean) -> Unit,
-    onValue: (Float) -> Unit,
+    integer: Boolean = false,
+    onValueChange: (Float) -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        SwitchRow(label = label, checked = enabled, onCheckedChange = onToggle)
-        if (enabled) {
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
             Text(
-                text = if (range.endInclusive > 1000f) value.roundToInt().toString() else String.format("%.2f", value),
-                style = MaterialTheme.typography.labelLarge,
+                text = if (integer) value.roundToInt().toString() else String.format("%.2f", value),
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Slider(
-                value = value.coerceIn(range),
-                onValueChange = onValue,
-                valueRange = range,
-            )
         }
+        Slider(
+            value = value.coerceIn(range),
+            onValueChange = onValueChange,
+            valueRange = range,
+        )
     }
 }
