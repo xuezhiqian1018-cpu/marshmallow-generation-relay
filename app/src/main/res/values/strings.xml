@@ -1941,4 +1941,13 @@
   <string name="icon_skin_purple">紫</string>
   <string name="icon_skin_slate">灰</string>
   <string name="icon_skin_gold">金</string>
+  <string name="conversation_settings_title">对话设置</string>
+  <string name="conversation_settings_instruction">指令（本对话）</string>
+  <string name="conversation_settings_prompt">提示词</string>
+  <string name="conversation_settings_lorebook">世界书</string>
+  <string name="conversation_settings_preset">预设</string>
+  <string name="conversation_settings_memory">记忆</string>
+  <string name="conversation_settings_model_params">模型参数</string>
+  <string name="conversation_settings_background">背景</string>
+  <string name="conversation_settings_blur">背景透明度</string>
 </resources>
