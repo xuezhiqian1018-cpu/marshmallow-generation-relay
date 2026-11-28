@@ -4,11 +4,14 @@ import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -34,6 +37,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
@@ -47,6 +52,7 @@ import me.rerere.hugeicons.stroke.Book01
 import me.rerere.hugeicons.stroke.Book03
 import me.rerere.hugeicons.stroke.Bookshelf01
 import me.rerere.hugeicons.stroke.Brain02
+import me.rerere.hugeicons.stroke.ChartColumn
 import me.rerere.hugeicons.stroke.Clapping01
 import me.rerere.hugeicons.stroke.Database02
 import me.rerere.hugeicons.stroke.GlobalSearch
@@ -101,6 +107,44 @@ fun SettingPage(vm: SettingVM = koinViewModel()) {
     val localNetworkPermission = rememberLocalNetworkPermissionState()
     val notificationPermission = rememberNotificationPermissionState()
 
+    // 简星第一版风格：设置页单独用中性灰白配色，不跟随主题的青绿色
+    val baseColors = MaterialTheme.colorScheme
+    val neutralColors = baseColors.copy(
+        primary = Color(0xFF3C4043),
+        onPrimary = Color(0xFFFFFFFF),
+        primaryContainer = Color(0xFFE8EAED),
+        onPrimaryContainer = Color(0xFF3C4043),
+        secondary = Color(0xFF5F6368),
+        onSecondary = Color(0xFFFFFFFF),
+        secondaryContainer = Color(0xFFF1F3F4),
+        onSecondaryContainer = Color(0xFF3C4043),
+        tertiary = Color(0xFF5F6368),
+        onTertiary = Color(0xFFFFFFFF),
+        tertiaryContainer = Color(0xFFF1F3F4),
+        onTertiaryContainer = Color(0xFF3C4043),
+    )
+    var searchQuery by remember { mutableStateOf("") }
+    fun matches(text: String): Boolean = searchQuery.isBlank() || text.contains(searchQuery, ignoreCase = true)
+    val showGeneral = matches(stringResource(R.string.setting_page_general_settings)) ||
+        matches(stringResource(R.string.setting_page_color_mode)) ||
+        matches(stringResource(R.string.setting_page_preferences)) ||
+        matches(stringResource(R.string.setting_page_extensions))
+    val showModels = matches(stringResource(R.string.setting_page_model_and_services)) ||
+        matches(stringResource(R.string.setting_page_default_model)) ||
+        matches(stringResource(R.string.setting_page_providers)) ||
+        matches(stringResource(R.string.setting_page_tts_service)) ||
+        matches(stringResource(R.string.setting_page_web_server))
+    val showData = matches(stringResource(R.string.setting_page_data_settings)) ||
+        matches(stringResource(R.string.setting_page_data_backup)) ||
+        matches(stringResource(R.string.setting_page_chat_storage))
+    val showAbout = matches(stringResource(R.string.setting_page_about)) ||
+        matches("统计数据") ||
+        matches(stringResource(R.string.setting_page_quick_start)) ||
+        matches(stringResource(R.string.setting_page_documentation)) ||
+        matches(stringResource(R.string.setting_page_request_logs)) ||
+        matches(stringResource(R.string.setting_page_donate)) ||
+        matches(stringResource(R.string.setting_page_share))
+
     if (!settings.init && launchCount > 100 && (launchCount - settings.sponsorAlertDismissedAt) >= 50) {
         AlertDialog(
             onDismissRequest = {
@@ -127,6 +171,7 @@ fun SettingPage(vm: SettingVM = koinViewModel()) {
         )
     }
 
+    MaterialTheme(colorScheme = neutralColors) {
     Scaffold(
         topBar = {
             LargeFlexibleTopAppBar(
@@ -168,6 +213,49 @@ fun SettingPage(vm: SettingVM = koinViewModel()) {
                 }
             }
 
+            item("settingSearch") {
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        Icon(
+                            imageVector = HugeIcons.GlobalSearch,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Box(modifier = Modifier.weight(1f)) {
+                            if (searchQuery.isEmpty()) {
+                                Text(
+                                    text = "搜索设置",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            BasicTextField(
+                                value = searchQuery,
+                                onValueChange = { searchQuery = it },
+                                singleLine = true,
+                                textStyle = TextStyle(
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    fontSize = MaterialTheme.typography.bodyMedium.fontSize,
+                                ),
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (showGeneral) {
             item("generalSettings") {
                 var colorMode by rememberColorMode()
                 val containerColor = MaterialTheme.colorScheme.primaryContainer
@@ -221,6 +309,9 @@ fun SettingPage(vm: SettingVM = koinViewModel()) {
                 }
             }
 
+            }
+
+            if (showModels) {
             item("modelServices") {
                 val containerColor = MaterialTheme.colorScheme.tertiaryContainer
                 val contentColor = MaterialTheme.colorScheme.onTertiaryContainer
@@ -254,6 +345,9 @@ fun SettingPage(vm: SettingVM = koinViewModel()) {
                 }
             }
 
+            }
+
+            if (showData) {
             item("dataSettings") {
                 val storageState by produceState(-1 to 0L) {
                     value = filesManager.countChatFiles()
@@ -290,6 +384,9 @@ fun SettingPage(vm: SettingVM = koinViewModel()) {
                 }
             }
 
+            }
+
+            if (showAbout) {
             item("aboutSettings") {
                 val context = LocalContext.current
                 val shareText = stringResource(R.string.setting_page_share_text)
@@ -340,6 +437,12 @@ fun SettingPage(vm: SettingVM = koinViewModel()) {
                         headlineContent = { Text(stringResource(R.string.setting_page_about)) },
                     )
                     item(
+                        onClick = { navController.navigate(Screen.Stats) },
+                        leadingContent = { CardGroupIcon(HugeIcons.ChartColumn, containerColor = containerColor, contentColor = contentColor) },
+                        supportingContent = { Text("查看对话统计") },
+                        headlineContent = { Text("统计数据") },
+                    )
+                    item(
                         onClick = { navController.navigate(Screen.QuickStart) },
                         leadingContent = { CardGroupIcon(HugeIcons.Rocket01, containerColor = containerColor, contentColor = contentColor) },
                         supportingContent = { Text(stringResource(R.string.setting_page_quick_start_desc)) },
@@ -387,7 +490,9 @@ fun SettingPage(vm: SettingVM = koinViewModel()) {
                     )
                 }
             }
+            }
         }
+    }
     }
 }
 
