@@ -14,6 +14,7 @@ import me.rerere.rikkahub.data.ai.prompts.DEFAULT_TITLE_PROMPT
 import me.rerere.rikkahub.data.ai.prompts.DEFAULT_TRANSLATION_PROMPT
 import me.rerere.rikkahub.data.model.Assistant
 import me.rerere.rikkahub.data.model.Avatar
+import me.rerere.rikkahub.data.model.GenerationPreset
 import me.rerere.rikkahub.data.model.Lorebook
 import me.rerere.rikkahub.data.model.PromptInjection
 import me.rerere.rikkahub.data.model.QuickMessage
@@ -79,6 +80,8 @@ data class Settings(
     val selectedASRProviderId: Uuid? = null,
     val modeInjections: List<PromptInjection.ModeInjection> = DEFAULT_MODE_INJECTIONS,
     val lorebooks: List<Lorebook> = emptyList(),
+    // 酒馆式生成预设：可保存、可切换的一整套参数
+    val generationPresets: List<GenerationPreset> = emptyList(),
     val quickMessages: List<QuickMessage> = emptyList(),
     val webServerEnabled: Boolean = false,
     val webServerPort: Int = 8080,
