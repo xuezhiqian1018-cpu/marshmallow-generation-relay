@@ -1,6 +1,7 @@
 package me.rerere.rikkahub.ui.pages.setting
 
 import android.net.Uri
+import androidx.compose.foundation.clickable
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -70,6 +71,8 @@ import kotlin.uuid.Uuid
 import me.rerere.ai.provider.ProviderSetting
 import me.rerere.hugeicons.HugeIcons
 import me.rerere.hugeicons.stroke.Add01
+import me.rerere.hugeicons.stroke.ArrowDown01
+import me.rerere.hugeicons.stroke.ArrowRight01
 import me.rerere.hugeicons.stroke.ArrowRight01
 import me.rerere.hugeicons.stroke.Camera01
 import me.rerere.hugeicons.stroke.Cancel01
@@ -109,6 +112,9 @@ fun SettingProviderPage(vm: SettingVM = koinViewModel()) {
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     var searchQuery by remember { mutableStateOf("") }
     var deleteTarget by remember { mutableStateOf<ProviderSetting?>(null) }
+    // 分组折叠状态（参考图：按组折叠，点组标题展开/收起）
+    var enabledExpanded by remember { mutableStateOf(true) }
+    var disabledExpanded by remember { mutableStateOf(true) }
     val lazyListState = rememberLazyListState()
     val reorderableState = rememberReorderableLazyListState(lazyListState) { from, to ->
         val newProviders = settings.providers.toMutableList().apply {
@@ -224,22 +230,46 @@ fun SettingProviderPage(vm: SettingVM = koinViewModel()) {
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 state = lazyListState,
             ) {
-                items(filteredProviders, key = { it.id }) { provider ->
-                    ReorderableItem(
-                        state = reorderableState,
-                        key = provider.id
-                    ) { isDragging ->
-                        ProviderItem(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .then(longPressReorder(isDragging, enabled = searchQuery.isBlank())),
+                // 参考图布局：按「已启用 / 未启用」分组折叠，每组是行式列表（无副标题）
+                val enabledList = filteredProviders.filter { it.enabled }
+                val disabledList = filteredProviders.filter { !it.enabled }
+
+                item(key = "group_enabled") {
+                    ProviderGroupHeader(
+                        title = "已启用",
+                        count = enabledList.size,
+                        expanded = enabledExpanded,
+                        onClick = { enabledExpanded = !enabledExpanded },
+                    )
+                }
+                if (enabledExpanded) {
+                    items(enabledList, key = { it.id }) { provider ->
+                        ProviderRowItem(
+                            modifier = Modifier.fillMaxWidth(),
                             provider = provider,
                             onClick = {
                                 navController.navigate(Screen.SettingProviderDetail(providerId = provider.id.toString()))
                             },
-                            onDelete = {
-                                deleteTarget = provider
-                            }
+                        )
+                    }
+                }
+
+                item(key = "group_disabled") {
+                    ProviderGroupHeader(
+                        title = "未启用",
+                        count = disabledList.size,
+                        expanded = disabledExpanded,
+                        onClick = { disabledExpanded = !disabledExpanded },
+                    )
+                }
+                if (disabledExpanded) {
+                    items(disabledList, key = { it.id }) { provider ->
+                        ProviderRowItem(
+                            modifier = Modifier.fillMaxWidth(),
+                            provider = provider,
+                            onClick = {
+                                navController.navigate(Screen.SettingProviderDetail(providerId = provider.id.toString()))
+                            },
                         )
                     }
                 }
@@ -733,6 +763,102 @@ private fun ProviderItem(
                         onClick = onDelete,
                     ),
                 )
+            )
+        }
+    }
+}
+
+@Composable
+private fun ProviderGroupHeader(
+    title: String,
+    count: Int,
+    expanded: Boolean,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Icon(
+            imageVector = if (expanded) HugeIcons.ArrowDown01 else HugeIcons.ArrowRight01,
+            contentDescription = null,
+            modifier = Modifier.size(16.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.weight(1f),
+        )
+        Surface(
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        ) {
+            Text(
+                text = count.toString(),
+                style = MaterialTheme.typography.labelMedium,
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun ProviderRowItem(
+    provider: ProviderSetting,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(20.dp),
+        color = CustomColors.listItemColors.containerColor,
+        onClick = onClick,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            AutoAIIcon(
+                name = provider.name,
+                modifier = Modifier.size(28.dp),
+            )
+            Text(
+                text = provider.name,
+                style = MaterialTheme.typography.bodyLarge,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            Surface(
+                shape = CircleShape,
+                color = if (provider.enabled) {
+                    MaterialTheme.colorScheme.primaryContainer
+                } else {
+                    MaterialTheme.colorScheme.surfaceContainerHigh
+                },
+            ) {
+                Text(
+                    text = if (provider.enabled) "启用" else "禁用",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (provider.enabled) {
+                        MaterialTheme.colorScheme.onPrimaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp),
+                )
+            }
+            Icon(
+                imageVector = HugeIcons.ArrowRight01,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }
