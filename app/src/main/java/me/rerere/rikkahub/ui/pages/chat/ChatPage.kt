@@ -569,6 +569,7 @@ private fun ChatPageContent(
                 onUpdateTitle = { vm.updateTitle(it) },
                 onUpdateConversationSystemPrompt = { vm.updateConversationSystemPrompt(it) },
                 onUpdateAssistant = { vm.updateAssistant(it) },
+                onSavePresets = { presets -> vm.updateSettings { it.copy(generationPresets = presets) } },
             )
         }
     }
