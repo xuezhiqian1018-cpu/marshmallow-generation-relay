@@ -6,7 +6,6 @@ import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -179,24 +178,19 @@ fun CardGroupIcon(
     containerColor: Color = MaterialTheme.colorScheme.secondaryContainer,
     contentColor: Color = MaterialTheme.colorScheme.onSecondaryContainer,
 ) {
-    val animatedContainerColor by animateColorAsState(
-        targetValue = containerColor,
-        animationSpec = MaterialTheme.motionScheme.defaultEffectsSpec(),
-    )
     val animatedContentColor by animateColorAsState(
         targetValue = contentColor,
         animationSpec = MaterialTheme.motionScheme.defaultEffectsSpec(),
     )
+    // 简星美化：去掉圆形彩色底块，只保留细描线图标，颜色仍跟随当前主题（不改配色）
     Box(
-        modifier = modifier
-            .size(40.dp)
-            .background(animatedContainerColor, CircleShape),
+        modifier = modifier.size(40.dp),
         contentAlignment = Alignment.Center,
     ) {
         Icon(
             imageVector = icon,
             contentDescription = null,
-            modifier = Modifier.size(20.dp),
+            modifier = Modifier.size(24.dp),
             tint = animatedContentColor,
         )
     }
