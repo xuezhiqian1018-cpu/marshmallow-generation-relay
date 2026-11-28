@@ -272,9 +272,6 @@ private fun ModeInjectionTab(
                 IconButton(onClick = { importer.importFromFile() }) {
                     Icon(HugeIcons.FileImport, null)
                 }
-                IconButton(onClick = { tavernWorldLauncher.launch("application/json") }) {
-                    Icon(HugeIcons.Book01, "导入酒馆世界书")
-                }
             },
         ) {
             Button(onClick = { editState.open(PromptInjection.ModeInjection()) }) {
@@ -692,6 +689,9 @@ private fun LorebookTab(
             leadingContent = {
                 IconButton(onClick = { importer.importFromFile() }) {
                     Icon(HugeIcons.FileImport, null)
+                }
+                IconButton(onClick = { tavernWorldLauncher.launch("application/json") }) {
+                    Icon(HugeIcons.Book01, "导入酒馆世界书")
                 }
             },
         ) {
